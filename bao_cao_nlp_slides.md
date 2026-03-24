@@ -2,376 +2,370 @@
 marp: true
 theme: default
 paginate: true
-title: Bao cao de tai NLP tieng Viet
+style: |
+  section {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 22px;
+    color: #1a1a2e;
+    background: #ffffff;
+  }
+  section.cover {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+    color: #ffffff;
+  }
+  section.cover h1 { font-size: 38px; color: #e94560; margin-bottom: 8px; }
+  section.cover p  { color: #a8b2d8; font-size: 18px; }
+  h1 { color: #0f3460; font-size: 30px; border-bottom: 3px solid #e94560; padding-bottom: 6px; }
+  h2 { color: #16213e; font-size: 22px; }
+  table { width: 100%; border-collapse: collapse; font-size: 18px; }
+  th { background: #0f3460; color: #fff; padding: 6px 10px; }
+  td { padding: 5px 10px; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) td { background: #f0f4ff; }
+  code { background: #f4f6ff; border-radius: 4px; padding: 1px 5px; color: #e94560; }
+  blockquote { border-left: 4px solid #e94560; padding-left: 12px; color: #555; font-style: italic; }
+  .highlight { color: #e94560; font-weight: bold; }
 ---
 
-# Chuẩn hóa văn bản tiếng Việt và tiền xử lý dữ liệu NLP
+<!-- _class: cover -->
 
-- Nguồn dữ liệu: VOZ + YouTube
-- Mục tiêu: làm sạch dữ liệu tiếng Việt, mã hóa văn bản, xây dựng baseline
-- Nhóm bài toán chọn để đánh giá: phân loại nguồn văn bản (youtube vs voz)
+# Chuẩn hoá văn bản tiếng Việt<br>& Tiền xử lý dữ liệu NLP
+
+**Nguồn dữ liệu:** VOZ Forum + YouTube Comments
+
+> Xây dựng pipeline từ dữ liệu thô → baseline phân loại văn bản
 
 ---
 
 # Agenda
 
-- Bối cảnh và mục tiêu
-- Dữ liệu và cách thu thập
-- Pipeline tiền xử lý
-- Mã hóa văn bản
-- Baseline và đánh giá
-- Hạn chế, cải tiến và kết luận
+1. 🎯 Mục tiêu & bối cảnh bài toán
+2. 📦 Thu thập & tổng quan dữ liệu
+3. ⚙️ Pipeline tiền xử lý
+4. 🔤 Mã hoá văn bản (5 phương pháp)
+5. 📊 Baseline & kết quả đánh giá
+6. ⚠️ Hạn chế & hướng phát triển
 
 ---
 
 # 1. Mục tiêu đề tài
 
-- Crawl dữ liệu bình luận/bài viết tiếng Việt từ 2 nguồn
-- Chuẩn hóa văn bản mạng xã hội: teencode, viết tắt, không dấu, ký tự nhiễu
-- Tiền xử lý phục vụ NLP: tokenization, stopword, chuẩn hóa từ vựng
-- So sánh các phương pháp mã hóa văn bản
-- Huấn luyện và đánh giá mô hình baseline
+- **Thu thập** dữ liệu bình luận tiếng Việt từ 2 nguồn (VOZ, YouTube)
+- **Chuẩn hoá** văn bản mạng xã hội:
+  - Teencode, viết tắt, chữ không dấu
+  - Ký tự nhiễu: emoji, HTML tag, URL, timestamp
+- **Tiền xử lý NLP**: tokenisation, chuẩn hoá từ vựng, phát hiện ngôn ngữ
+- **So sánh** 5 phương pháp mã hoá văn bản
+- **Huấn luyện & đánh giá** mô hình baseline (3 thuật toán)
 
 ---
 
 # 2. Bối cảnh bài toán
 
-- Văn bản mạng xã hội tiếng Việt có nhiều nhiễu:
-  - Teencode, viết tắt, không dấu
-  - Emoji, HTML tag, URL, ký tự đặc biệt
-  - Trộn tiếng Anh và tiếng Việt
-- Nếu không chuẩn hóa tốt:
-  - Tách từ sai
-  - Từ vựng phân mảnh
-  - Mô hình học kém ổn định
+**Tại sao văn bản mạng xã hội tiếng Việt khó xử lý?**
+
+| Vấn đề | Ví dụ thực tế |
+|--------|---------------|
+| Teencode / viết tắt | `ko` → không, `đc` → được, `mn` → mọi người |
+| Chữ không dấu | `khong` → không, `duoc` → được |
+| Lặp ký tự | `đẹppppp` → đẹpp |
+| HTML / URL | `<br>`, `https://...` |
+| Trộn Anh-Việt | *"video này hay quá lol"* |
+| Đại từ chat | `a` → anh, `e` → em, `t` → tôi |
+
+> Nếu không chuẩn hoá → tách từ sai → từ vựng phân mảnh → mô hình kém
 
 ---
 
 # 3. Dữ liệu đầu vào
 
-- File nguồn sử dụng:
-  - yt_comments.csv
-  - voz_threads_comments.csv
-- Sau bootstrap + làm sạch: 6905 mẫu
-- Phân bố nguồn:
-  - YouTube: 6787
-  - VOZ: 118
-- Phân bố ngôn ngữ sau detect:
-  - vi: 6845
-  - en: 57
-  - mixed: 3
+**File nguồn:**
+- `yt_comments.csv` — bình luận YouTube
+- `voz_threads_comments.csv` — bài viết / bình luận VOZ
 
-Ghi chú: dữ liệu mất cân bằng mạnh giữa 2 nguồn.
+**Sau tiền xử lý:**
 
----
+| Chỉ số | Giá trị |
+|--------|---------|
+| Tổng mẫu hợp lệ | **6 905** |
+| YouTube | 6 787 (98.3%) |
+| VOZ | 118 (1.7%) |
+| Tiếng Việt (`vi`) | 6 845 (99.1%) |
+| Tiếng Anh (`en`) | 57 (0.8%) |
+| Mixed | 3 (0.1%) |
+| Độ dài TB | **9.95 token/mẫu** |
 
-# 4. Quy mô dữ liệu sau xử lý
-
-- Tổng mẫu sau tiền xử lý: 6905
-- Tỷ lệ ngôn ngữ:
-  - Tiếng Việt: 6845 (99.1%)
-  - Tiếng Anh: 57 (0.8%)
-  - Mixed: 3 (0.1%)
-- Độ dài trung bình: 9.95 token/mẫu
-
-Ý nghĩa: dữ liệu đủ lớn để benchmark baseline dạng sparse feature.
+> ⚠️ **Mất cân bằng lớn** giữa 2 nguồn — cần lưu ý khi diễn giải kết quả
 
 ---
 
-# 5. Kiến trúc pipeline tổng quát
+# 4. Kiến trúc pipeline tổng quát
 
-- Chuẩn hóa unicode (NFC), lower-case
-- Làm sạch HTML/URL/mention/hashtag/timestamp
-- Phát hiện ngôn ngữ (vi, en, mixed)
-- Chuẩn hóa teencode + viết tắt bằng normalization_map
-- Tách câu trước khi tách từ
-- Tokenize bằng underthesea (vi), split cho en
-- Hậu xử lý token nhiễu
-- Tùy chọn lọc stopwords cho mục tiêu modeling
-
----
-
-# 6. Luồng xử lý chi tiết
-
-1. Nhập dữ liệu gốc (YouTube + VOZ)
-2. Tạo cột source và raw_text
-3. Phát hiện ngôn ngữ từng dòng
-4. Chuẩn hóa teencode + viết tắt
-5. Tách câu -> tách từ
-6. Hậu xử lý token (lọc nhiễu, hậu tố)
-7. Xuất cleaned_dataset_fixed.csv
-8. Chạy EDA + baseline
-
----
-
-# 7. Chuẩn hóa từ điển tiếng Việt
-
-- Từ điển map đã mở rộng:
-  - safe map: 159 mục
-  - vi-only map: 10 mục
-- Ví dụ chuẩn hóa:
-  - ko, k, hk, hok -> không
-  - đc, dc, dk -> được
-  - ae -> anh em
-  - mn -> mọi người
-  - youtobe -> youtube
-- Tách riêng map vi-only để tránh phá câu tiếng Anh (ví dụ t -> tôi)
-
-  ---
-
-  # 8. Ví dụ chuẩn hóa thực tế
-
-  - Input:
-    - Không đeo dưởng khí sao mà giỏi quá các bạn
-  - Sau chuẩn hóa:
-    - không đeo dưỡng_khí sao mà giỏi quá các bạn
-  - Token:
-    - [không, đeo, dưỡng_khí, sao, mà, giỏi, quá, các, bạn]
-
-  Điểm chính: giữ đủ token, không làm mất nghĩa ngữ cảnh.
+```
+Dữ liệu thô (yt_comments + voz)
+        │
+        ▼
+[1] Chuẩn hoá Unicode NFC + lower-case
+        │
+        ▼
+[2] Làm sạch: HTML / URL / mention / hashtag / timestamp
+        │
+        ▼
+[3] Phát hiện ngôn ngữ  →  vi / en / mixed
+        │
+        ▼
+[4] Chuẩn hoá cụm từ + đại từ chat  (chỉ vi/mixed)
+        │
+        ▼
+[5] Ánh xạ teencode / viết tắt  (safe_map + vi_only_map)
+        │
+        ▼
+[6] Tách câu  →  Tách từ  (underthesea / pyvi / basic)
+        │
+        ▼
+[7] Hậu xử lý token: lọc nhiễu, hậu tố, token quá ngắn
+        │
+        ▼
+  cleaned_dataset_fixed.csv
+```
 
 ---
 
-  # 9. Xử lý lỗi tách từ thường gặp
+# 5. Từ điển chuẩn hoá teencode
 
-- Vấn đề gặp thực tế:
-  - Token merge sai qua dấu chấm: sang_năm
-  - Token chat bị dính hậu tố: khỏe_nha
-  - Mất từ do lọc quá sớm
-- Cách khắc phục:
-  - Tách câu trước tokenize
-  - Chuẩn hóa cụm từ trước tokenize
-  - Giữ token đầy đủ mặc định, chỉ lọc stopwords khi cần mô hình
+Tách thành **2 bản đồ** để tránh phá câu tiếng Anh:
 
-Ví dụ cải thiện:
-- Input: Không đeo dưởng khí sao mà giỏi quá các bạn
-- Token sau sửa: [không, đeo, dưỡng_khí, sao, mà, giỏi, quá, các, bạn]
+| Bản đồ | Áp dụng khi | Ví dụ |
+|--------|------------|-------|
+| `safe_map` (23+ mục) | Mọi ngôn ngữ | `ko→không`, `dc→được`, `ae→anh em` |
+| `vi_only_map` (9 mục) | Chỉ `vi` / `mixed` | `t→tôi`, `a→anh`, `e→em` |
 
----
+**Một số mục tiêu biểu:**
 
-# 10. Stopwords: khi nào dùng, khi nào không
-
-- Trong bước kiểm tra chất lượng tách từ:
-  - Giữ full token (không loại stopwords)
-- Trong bước huấn luyện baseline:
-  - Có thể bật remove_stopwords để giảm nhiễu
-- Bài học:
-  - Nên tách 2 mục tiêu: phân tích ngôn ngữ vs tối ưu mô hình
+```
+ko, kg, hk, hok  →  không        dc, đc, dk  →  được
+mn, mng          →  mọi người    cx, cug     →  cũng
+youtobe          →  youtube      oke, okie   →  ổn
+ntn              →  như thế nào  ae          →  anh em
+```
 
 ---
 
-# 11. EDA sau tiền xử lý
+# 6. Phát hiện ngôn ngữ
 
-- Số mẫu cuối: 6905
-- Độ dài token trung bình: 9.95 token/mẫu
-- Tổng số token có dấu gạch dưới: 9313
-- Số loại token ghép: 3508
+Dùng **rule-based heuristic** (không cần model):
 
-Top token xuất hiện nhiều (tham khảo):
-- chị, ăn, không, quá, em, quỳnh, mà, cô, là, có, nhìn, được, con, ngon, xem
+```python
+# Có ký tự có dấu tiếng Việt (à, ă, â, đ, ê, ô, ơ, ư…)?
+has_vi = bool(VI_CHAR_PAT.search(text))
 
----
+# Đếm từ tiếng Anh phổ biến
+en_word_count = sum(1 for w in words if w in EN_STOPWORDS)
 
-# 12. Ý nghĩa EDA
+# Quy tắc phân loại
+if has_vi and en_word_count < 3:   return "vi"
+if not has_vi and en_count >= 2:   return "en"
+if has_vi and en_count >= 3:       return "mixed"
+```
 
-- Token ghép nhiều -> dữ liệu hội thoại tự nhiên, giàu ngữ cảnh
-- Tần suất cao của token cảm xúc/ngữ khí (quá, ngon, xem...)
-- Phân bố nguồn lệch -> cần lưu ý khi diễn giải độ chính xác
-- Ngôn ngữ gần như tiếng Việt thuần sau bước chuẩn hóa
-
----
-
-# 13. Các file output chính
-
-- outputs/cleaned_dataset.csv
-- outputs/cleaned_dataset_fixed.csv
-- outputs/pipeline_report.json
-- outputs/pipeline_report.png
-- outputs/baseline_results.csv
-
-Mục tiêu: đảm bảo tính tái lập và truy vết toàn bộ pipeline.
+**Kết quả:** 99.1% vi → phù hợp với đặc trưng dữ liệu
 
 ---
 
-# 14. Mã hóa văn bản đã thực hiện
+# 7. Tokenisation
 
-- One-Hot (binary CountVectorizer)
-- Count Vectorizer
-- N-grams (1,2)
-- Hashing Vectorizer
-- TF-IDF
-- Co-occurrence matrix (đã có trong pipeline phân tích)
-- Word Embedding (đã có trong pipeline trước đó)
+**Thứ tự ưu tiên (tự động fallback):**
 
-Ghi chú: bản đánh giá hiện tại tập trung nhóm vectorizer sparse cho baseline ổn định.
+```
+1. underthesea  →  word_tokenize(sent, format="text")
+2. pyvi         →  ViTokenizer.tokenize(sent)
+3. basic        →  sent.split()
+```
 
----
+**Quy trình:** Tách câu trước → tách từ từng câu → clean token
 
-# 15. So sánh nhanh các kỹ thuật mã hóa
+**Vấn đề thường gặp & cách xử lý:**
 
-- One-Hot:
-  - Đơn giản, mạnh cho baseline
-- Count:
-  - Bảo toàn tần suất từ
-- N-gram:
-  - Bắt được cụm 2 từ
-- TF-IDF:
-  - Giảm ảnh hưởng từ quá phổ biến
-- Hashing:
-  - Nhanh, tiết kiệm bộ nhớ
-- Embedding:
-  - Biểu diễn ngữ nghĩa tốt hơn (khi mở rộng mô hình)
+| Vấn đề | Ví dụ | Cách xử lý |
+|--------|-------|-----------|
+| Token dính hậu tố chat | `khỏe_nha` | Cắt hậu tố `_nha`, `_nhé`, `_ạ`… |
+| Token lặp ký tự | `đẹppppp` | Regex `(.)\\1{2,}` → `đẹpp` |
+| Token merge qua dấu chấm | `sang_năm` | Ánh xạ → `sang` |
+| Đại từ đơn chữ cái ASCII | `a`, `e` | Lọc nếu `len ≤ 1 and isascii()` |
 
 ---
 
-# 16. Co-occurrence matrix dùng để làm gì
+# 8. Ví dụ chuẩn hoá thực tế
 
-- Phân tích từ đồng xuất hiện trong cùng ngữ cảnh
-- Hỗ trợ khám phá chủ đề và cụm từ
-- Có thể dùng cho:
-  - trực quan hóa mạng từ
-  - feature engineering bổ sung
-  - kiểm tra chất lượng chuẩn hóa từ điển
+**Input gốc:**
+> *"Mn oi ko đeo dưởng khí sao mà giỏi z vl ae oi"*
 
----
+**Sau chuẩn hoá từng bước:**
 
-# 17. Baseline mô hình
-
-- Naive Bayes
-- Logistic Regression
-- Linear SVM
-
-Nhãn bài toán: source (youtube, voz)
-- Đây là baseline kỹ thuật để so sánh pipeline xử lý và biểu diễn dữ liệu
-- Có thể thay bằng nhãn nghiệp vụ khác (sentiment/topic) khi có dữ liệu gán nhãn
+| Bước | Kết quả |
+|------|---------|
+| Lower + Unicode NFC | `mn oi ko đeo dưởng khí sao mà giỏi z vl ae oi` |
+| Cụm từ + đại từ | `mọi người ơi ko đeo dưỡng khí sao mà giỏi vậy rất anh em ơi` |
+| Ánh xạ teencode | `mọi người ơi không đeo dưỡng khí sao mà giỏi vậy rất anh em ơi` |
+| Tách từ (underthesea) | `mọi_người ơi không đeo dưỡng_khí sao mà giỏi vậy rất anh_em ơi` |
+| Hậu xử lý | `mọi_người không đeo dưỡng_khí sao mà giỏi vậy rất anh_em` |
 
 ---
 
-# 18. Thiết lập đánh giá
+# 9. EDA sau tiền xử lý
 
-- Chia tập train/test có stratify theo source
-- Metrics báo cáo:
-  - Accuracy
-  - Precision weighted
-  - Recall weighted
-  - F1-weighted
-- Tiêu chí chọn mô hình: ưu tiên F1-weighted, sau đó Accuracy
+**Thống kê tổng quan:**
 
----
+| Chỉ số | Giá trị |
+|--------|---------|
+| Tổng mẫu cuối | 6 905 |
+| Độ dài trung bình | 9.95 token/mẫu |
+| Tổng token có dấu gạch dưới | 9 313 |
+| Số loại token ghép (unique) | 3 508 |
 
-# 19. Kết quả đánh giá (baseline)
+**Top token xuất hiện nhiều nhất:**
 
-Top kết quả (outputs/baseline_results.csv):
-- OneHot + LinearSVM:
-  - Accuracy: 0.9906
-  - F1-weighted: 0.9889
-- TFIDF + LinearSVM:
-  - Accuracy: 0.9899
-  - F1-weighted: 0.9878
-- OneHot + NaiveBayes:
-  - Accuracy: 0.9884
-  - F1-weighted: 0.9873
+> `không` · `có` · `là` · `em` · `chị` · `ăn` · `quá` · `ngon` · `xem` · `được` · `mà` · `con` · `cô` · `nhìn`
 
-Nhận xét nhanh:
-- LinearSVM cho hiệu năng tốt và ổn định nhất trên dữ liệu hiện tại.
+→ Token cảm xúc, ngữ khí chiếm tần suất cao → phù hợp bài toán phân tích cảm xúc
 
 ---
 
-# 20. Bảng top mô hình (rút gọn)
+# 10. Mã hoá văn bản – Tổng quan
 
-- OneHot + LinearSVM: F1 = 0.9889
-- TFIDF + LinearSVM: F1 = 0.9878
-- OneHot + NaiveBayes: F1 = 0.9873
-- Ngrams(1,2) + LinearSVM: F1 = 0.9867
-- Count + LinearSVM: F1 = 0.9861
+| Phương pháp | Features | Đặc điểm |
+|-------------|----------|-----------|
+| **One-Hot** (Binary BoW) | 3 000 | Không quan tâm tần suất |
+| **Count Vectorizer** | 6 000 | Bảo toàn tần suất từ |
+| **N-grams (1,2)** | 12 000 | Bắt được cụm 2 từ |
+| **Hashing Vectorizer** | 16 384 | Nhanh, không cần `fit` |
+| **TF-IDF (1,2)** | 12 000 | Giảm trọng số từ quá phổ biến |
 
-Kết luận: mô hình tuyến tính trên đặc trưng sparse phù hợp với tập dữ liệu này.
-
----
-
-# 21. Giải thích kết quả
-
-- OneHot/TF-IDF + LinearSVM mạnh với dữ liệu text sparse
-- Naive Bayes vẫn cạnh tranh tốt trên dữ liệu từ vựng cao chiều
-- Dữ liệu lệch nhãn lớn (youtube >> voz) làm kết quả có thể lạc quan
-
-Điểm cần lưu ý:
-- Bài toán hiện tại là phân loại nguồn, chưa phản ánh đầy đủ bài toán cảm xúc/chủ đề.
+> ℹ️ `HashingVectorizer` không cần `fit()` — dùng `transform()` trực tiếp cho cả train lẫn test
 
 ---
 
-# 22. Error analysis ngắn
+# 11. Mô hình baseline & thiết lập đánh giá
 
-- Nhóm lỗi còn lại:
-  - Comment không dấu khó tách từ chính xác
-  - Comment pha Anh-Việt
-  - Từ lóng mới chưa có trong normalization_map
-- Tác động:
-  - Tăng số token hiếm
-  - Giảm tính nhất quán giữa các biến thể từ
+**3 thuật toán được đánh giá:**
+- 🔵 **Naive Bayes** (`MultinomialNB`) — nhanh, phù hợp dữ liệu sparse
+- 🟢 **Logistic Regression** (`max_iter=1200`) — ổn định, diễn giải được
+- 🔴 **Linear SVM** (`LinearSVC`) — mạnh với không gian cao chiều
 
----
+**Thiết lập:**
 
-# 23. Hạn chế hiện tại
+```python
+train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+```
 
-- Mất cân bằng dữ liệu rất lớn giữa YouTube và VOZ
-- Còn câu tiếng Anh/mixed trong tập dữ liệu
-- Văn bản không dấu, teencode cực đoan vẫn gây nhiễu tách từ
-- Chưa có bộ nhãn nghiệp vụ (positive/negative/topic) để đánh giá thực tế hơn
+**Metrics báo cáo:** Accuracy · Precision · Recall · **F1-weighted** *(ưu tiên)*
 
 ---
 
-# 24. Hướng phát triển
+# 12. Kết quả baseline
 
-- Tăng dữ liệu VOZ để cân bằng nhãn
-- Bổ sung bước phục hồi dấu tiếng Việt cho text không dấu
-- Thiết kế bộ từ điển domain-specific theo chủ đề
-- Thu thập/gán nhãn sentiment hoặc topic để đánh giá đúng bài toán NLP ứng dụng
-- Thử mô hình nâng cao:
-  - fastText
-  - PhoBERT fine-tuning
-  - SVM với class_weight
+| Biểu diễn | Mô hình | Accuracy | F1-weighted |
+|------------|---------|----------|-------------|
+| **One-Hot** | **LinearSVM** | **0.9906** | **0.9889** |
+| TF-IDF | LinearSVM | 0.9899 | 0.9878 |
+| One-Hot | NaiveBayes | 0.9884 | 0.9873 |
+| N-grams(1,2) | LinearSVM | 0.9877 | 0.9867 |
+| Count | LinearSVM | 0.9870 | 0.9861 |
+| TF-IDF | LogisticReg | 0.9863 | 0.9850 |
+| Hashing | LinearSVM | 0.9856 | 0.9843 |
 
----
-
-# 25. Kế hoạch triển khai tiếp theo
-
-- Giai đoạn 1: cân bằng dữ liệu + lọc chất lượng comment
-- Giai đoạn 2: gán nhãn sentiment/topic
-- Giai đoạn 3: benchmark baseline vs PhoBERT
-- Giai đoạn 4: đóng gói pipeline thành script tái sử dụng
-
-Mục tiêu: chuyển từ demo kỹ thuật sang bài toán NLP ứng dụng thực tế.
+> 🏆 **One-Hot + LinearSVM** đứng đầu — Accuracy 0.9906, F1 0.9889
 
 ---
 
-# 26. Kết luận
+# 13. Phân tích kết quả
 
-- Đã hoàn thành pipeline thu thập và chuẩn hóa dữ liệu tiếng Việt từ 2 nguồn
-- Đã thực hiện đầy đủ các nhóm mã hóa văn bản quan trọng
-- Baseline cho kết quả cao trên bài toán phân loại nguồn (best Accuracy 0.9906)
-- Pipeline sẵn sàng mở rộng sang bài toán có nhãn thực tế (sentiment/topic)
+**Nhận xét:**
+
+- **LinearSVM** cho kết quả tốt nhất và ổn định nhất trên mọi biểu diễn
+- **Naive Bayes** cạnh tranh tốt — phù hợp dữ liệu text sparse nhiều chiều
+- **Logistic Regression** kết quả tốt nhưng chậm hơn SVM
+- One-Hot và TF-IDF cho kết quả tương đương → từ vựng phân biệt nguồn tốt
+
+**Lưu ý quan trọng:**
+
+> ⚠️ Bài toán là **phân loại nguồn** (`youtube` vs `voz`) — nhãn dễ phân biệt do phong cách viết khác nhau. Kết quả cao **không phản ánh** hiệu năng với bài toán cảm xúc/chủ đề thực tế.
 
 ---
 
-# 27. Tài nguyên kết quả
+# 14. Error analysis
 
-- outputs/cleaned_dataset.csv
-- outputs/cleaned_dataset_fixed.csv
-- outputs/pipeline_report.json
-- outputs/pipeline_report.png
-- outputs/baseline_results.csv
-- src/run_nlp_pipeline.py
-- src/run_baseline_eval.py
+**Nhóm lỗi còn lại:**
 
-Xin cảm ơn.
+| Nhóm | Mô tả |
+|------|-------|
+| văn bản không dấu cực đoan | Tokeniser không nhận diện → tách sai |
+| Pha Anh-Việt cao | Token nhiễu tiếng Anh lọt qua |
+| Teencode mới | Không có trong `normalization_map.json` |
+| Nhãn lệch | VOZ chiếm < 2% → model thiên lệch |
+
+---
+
+# 15. Hạn chế hiện tại
+
+- 📉 **Mất cân bằng nghiêm trọng**: YouTube 98.3% vs VOZ 1.7%
+- 🔤 **Văn bản không dấu** chưa được phục hồi tự động
+- 📚 **Từ điển teencode** chưa đủ — thiếu slang mới
+- 🏷️ **Chưa có nhãn nghiệp vụ** (cảm xúc / chủ đề) → chỉ đánh giá proxy
+- 🤖 **Chưa thử pre-trained embedding** (PhoBERT, fastText-vi)
+
+---
+
+# 16. Hướng phát triển
+
+**Ngắn hạn:**
+- Thu thập thêm dữ liệu VOZ để cân bằng nhãn
+- Tích hợp bước **phục hồi dấu** (VnCoreNLP accent restoration)
+- Mở rộng `normalization_map.json` theo domain
+
+**Dài hạn:**
+- Gán nhãn **sentiment / topic** để đánh giá bài toán thực tế
+- Benchmark với:
+  - **fastText** (embedding tiếng Việt)
+  - **PhoBERT** fine-tuning
+  - SVM với `class_weight='balanced'`
+- Đóng gói pipeline thành REST API hoặc Python package
+
+---
+
+# 17. Kết luận
+
+✅ Đã xây dựng pipeline **thu thập → chuẩn hoá → mã hoá → đánh giá** hoàn chỉnh
+
+✅ Xử lý tốt các đặc thù tiếng Việt mạng xã hội: teencode, đại từ chat, token nhiễu
+
+✅ **5 phương pháp mã hoá** + **3 mô hình baseline** → tổng 15 kịch bản đánh giá
+
+✅ Best accuracy: **0.9906** (One-Hot + LinearSVM)
+
+✅ Pipeline sẵn sàng mở rộng sang nhãn sentiment / topic
+
+---
+
+# File đầu ra
+
+| File | Mô tả |
+|------|-------|
+| `outputs/cleaned_dataset.csv` | Dữ liệu gốc sau bootstrap |
+| `outputs/cleaned_dataset_fixed.csv` | Dữ liệu đã tiền xử lý đầy đủ |
+| `outputs/pipeline_report.json` | Báo cáo thống kê pipeline |
+| `outputs/pipeline_report.png` | Biểu đồ phân bố dữ liệu |
+| `outputs/baseline_results.csv` | Kết quả đánh giá 15 kịch bản |
+| `src/nlp_pipeline/nlp_pipeline.ipynb` | Notebook pipeline (10 cells) |
+| `src/nlp_pipeline/baseline_eval.ipynb` | Notebook baseline (10 cells) |
 
 ---
 
 # Q&A
 
-Xin cảm ơn thầy/cô và các bạn.
+## Xin cảm ơn thầy/cô và các bạn đã lắng nghe!
+
 Sẵn sàng trao đổi thêm về:
-- Chi tiết pipeline
-- Cách mở rộng dữ liệu
-- Cách chuyển sang bài toán sentiment/topic
+
+- 🔧 Chi tiết kỹ thuật pipeline
+- 📊 Cách diễn giải kết quả với dữ liệu lệch nhãn
+- 🚀 Hướng mở rộng sang PhoBERT / sentiment analysis
