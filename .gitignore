@@ -36,9 +36,6 @@ env/
 .ipynb_checkpoints/
 
 # Data files
-*.csv
-*.xlsx
-*.json
 data/
 datasets/
 

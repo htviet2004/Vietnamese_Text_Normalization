@@ -1,0 +1,139 @@
+{
+  "total_rows": 6905,
+  "source_distribution": {
+    "youtube": 6787,
+    "voz": 118
+  },
+  "lang_distribution": {
+    "vi": 6845,
+    "en": 57,
+    "mixed": 3
+  },
+  "avg_token_len": 9.954815351194787,
+  "underscore_analysis": {
+    "total_underscore_types": 3508,
+    "total_underscore_occurrences": 9313,
+    "top_30": [
+      [
+        "hải_sản",
+        366
+      ],
+      [
+        "chúc_mừng",
+        313
+      ],
+      [
+        "dễ_thương",
+        196
+      ],
+      [
+        "vợ_chồng",
+        142
+      ],
+      [
+        "đồ_ăn",
+        96
+      ],
+      [
+        "hôm_nay",
+        79
+      ],
+      [
+        "ủng_hộ",
+        78
+      ],
+      [
+        "quỳnh_ăn",
+        72
+      ],
+      [
+        "thành_công",
+        67
+      ],
+      [
+        "như_vậy",
+        66
+      ],
+      [
+        "hấp_dẫn",
+        62
+      ],
+      [
+        "anh_chị",
+        61
+      ],
+      [
+        "việt_nam",
+        59
+      ],
+      [
+        "nước_miếng",
+        57
+      ],
+      [
+        "gia_đình",
+        57
+      ],
+      [
+        "cảm_ơn",
+        54
+      ],
+      [
+        "ăn_mừng",
+        54
+      ],
+      [
+        "ăn_uống",
+        53
+      ],
+      [
+        "nói_chuyện",
+        51
+      ],
+      [
+        "có_thể",
+        49
+      ],
+      [
+        "trấn_thành",
+        47
+      ],
+      [
+        "bình_luận",
+        47
+      ],
+      [
+        "mẹ_con",
+        46
+      ],
+      [
+        "hạnh_phúc",
+        42
+      ],
+      [
+        "hoành_tráng",
+        42
+      ],
+      [
+        "bao_giờ",
+        40
+      ],
+      [
+        "bao_nhiêu",
+        40
+      ],
+      [
+        "c_quỳnh",
+        40
+      ],
+      [
+        "tuyệt_vời",
+        32
+      ],
+      [
+        "bình_thường",
+        32
+      ]
+    ]
+  }
+}
