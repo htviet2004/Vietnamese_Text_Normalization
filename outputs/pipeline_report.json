@@ -1,34 +1,42 @@
 {
-  "total_rows": 6905,
+  "total_rows": 6906,
   "source_distribution": {
-    "youtube": 6787,
+    "youtube": 6788,
     "voz": 118
   },
   "lang_distribution": {
-    "vi": 6845,
+    "vi": 6846,
     "en": 57,
     "mixed": 3
   },
-  "avg_token_len": 9.954815351194787,
+  "avg_token_len": 10.029539530842746,
   "underscore_analysis": {
-    "total_underscore_types": 3508,
-    "total_underscore_occurrences": 9313,
+    "total_underscore_types": 3465,
+    "total_underscore_occurrences": 9600,
     "top_30": [
       [
         "hải_sản",
-        366
+        367
       ],
       [
         "chúc_mừng",
-        313
+        317
       ],
       [
         "dễ_thương",
-        196
+        232
       ],
       [
         "vợ_chồng",
-        142
+        168
+      ],
+      [
+        "đăng_ký",
+        145
+      ],
+      [
+        "khó_khăn",
+        98
       ],
       [
         "đồ_ăn",
@@ -36,7 +44,7 @@
       ],
       [
         "hôm_nay",
-        79
+        87
       ],
       [
         "ủng_hộ",
@@ -51,7 +59,15 @@
         67
       ],
       [
+        "anh_chị",
+        66
+      ],
+      [
         "như_vậy",
+        66
+      ],
+      [
+        "gia_đình",
         66
       ],
       [
@@ -59,23 +75,19 @@
         62
       ],
       [
-        "anh_chị",
-        61
-      ],
-      [
         "việt_nam",
         59
       ],
       [
         "nước_miếng",
-        57
-      ],
-      [
-        "gia_đình",
-        57
+        58
       ],
       [
         "cảm_ơn",
+        54
+      ],
+      [
+        "hạnh_phúc",
         54
       ],
       [
@@ -87,8 +99,16 @@
         53
       ],
       [
+        "bao_nhiêu",
+        52
+      ],
+      [
         "nói_chuyện",
         51
+      ],
+      [
+        "tuyệt_vời",
+        50
       ],
       [
         "có_thể",
@@ -96,7 +116,7 @@
       ],
       [
         "trấn_thành",
-        47
+        48
       ],
       [
         "bình_luận",
@@ -107,32 +127,12 @@
         46
       ],
       [
-        "hạnh_phúc",
+        "bao_giờ",
         42
       ],
       [
         "hoành_tráng",
         42
-      ],
-      [
-        "bao_giờ",
-        40
-      ],
-      [
-        "bao_nhiêu",
-        40
-      ],
-      [
-        "c_quỳnh",
-        40
-      ],
-      [
-        "tuyệt_vời",
-        32
-      ],
-      [
-        "bình_thường",
-        32
       ]
     ]
   }

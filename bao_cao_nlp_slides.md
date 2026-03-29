@@ -98,35 +98,171 @@ style: |
 
 ---
 
-# 4. Kiến trúc pipeline tổng quát
+# 4. Kiến trúc pipeline – Tổng quan
 
 ```
-Dữ liệu thô (yt_comments + voz)
-        │
-        ▼
-[1] Chuẩn hoá Unicode NFC + lower-case
-        │
-        ▼
-[2] Làm sạch: HTML / URL / mention / hashtag / timestamp
-        │
-        ▼
-[3] Phát hiện ngôn ngữ  →  vi / en / mixed
-        │
-        ▼
-[4] Chuẩn hoá cụm từ + đại từ chat  (chỉ vi/mixed)
-        │
-        ▼
-[5] Ánh xạ teencode / viết tắt  (safe_map + vi_only_map)
-        │
-        ▼
-[6] Tách câu  →  Tách từ  (underthesea / pyvi / basic)
-        │
-        ▼
-[7] Hậu xử lý token: lọc nhiễu, hậu tố, token quá ngắn
-        │
-        ▼
-  cleaned_dataset_fixed.csv
+ ┌─────────────────────────────────────────────────────────────┐
+ │              INPUT: yt_comments + voz_threads               │
+ └───────────────────────────┬─────────────────────────────────┘
+                             │
+          ┌──────────────────▼──────────────────┐
+          │  PHASE 1 – Thu thập & Bootstrap      │
+          │  bootstrap_input_if_missing()         │
+          └──────────────────┬──────────────────┘
+                             │
+          ┌──────────────────▼──────────────────┐
+          │  PHASE 2 – Text Normalisation        │
+          │  unicode → clean noise → lang detect │
+          │  → phrase norm → word norm           │
+          └──────────────────┬──────────────────┘
+                             │
+          ┌──────────────────▼──────────────────┐
+          │  PHASE 3 – Tokenisation              │
+          │  split_sentences → tokenize_vi/en    │
+          │  → clean_token → filter              │
+          └──────────────────┬──────────────────┘
+                             │
+          ┌──────────────────▼──────────────────┐
+          │  OUTPUT: cleaned_dataset_fixed.csv   │
+          │  + pipeline_report.json / .png       │
+          └─────────────────────────────────────┘
 ```
+
+---
+
+# 4a. Phase 1 – Thu thập & Bootstrap dữ liệu
+
+**Hàm `bootstrap_input_if_missing(project_root, input_csv)`**
+
+```
+yt_comments.csv          voz_threads_comments.csv
+       │                          │
+       │  source = "youtube"      │  source = "voz"
+       │  raw_text = text col     │  raw_text = text col
+       └──────────┬───────────────┘
+                  │  pd.concat + dropna + strip
+                  ▼
+         outputs/cleaned_dataset.csv
+         (cột: source | raw_text)
+```
+
+**Phát hiện cột văn bản tự động** (fallback chain):
+```python
+for col in ("text", "comment", "content", "body"):
+    if col in df.columns: return df[col]
+return df.iloc[:, 0]   # fallback: cột đầu tiên
+```
+
+**Đầu vào / Đầu ra:**
+
+| | File |
+|--|------|
+| In | `yt_comments.csv`, `voz_threads_comments.csv` |
+| Out | `outputs/cleaned_dataset.csv` (6 905 dòng) |
+
+---
+
+# 4b. Phase 2 – Chuẩn hoá văn bản (chi tiết)
+
+```
+raw_text
+   │
+   ├─[1]─ unicodedata.normalize("NFC") + .lower().strip()
+   │       html.unescape()  →  giải mã &amp; &quot; …
+   │
+   ├─[2]─ detect_language()
+   │       VI_CHAR_PAT  +  EN_STOPWORDS counter
+   │       → "vi" | "en" | "mixed"
+   │
+   ├─[3]─ remove_noise()
+   │       HTML_TAG · URL_PAT · TIMESTAMP
+   │       MENTION · HASHTAG · REPEATED · UNICODE_KEEP
+   │
+   ├─[4]─ (chỉ vi/mixed)
+   │       apply_phrase_norm()   → "ko vấn đề" → "không vấn đề"
+   │       normalize_chat_pronouns()  → a→anh, e→em, t→tôi
+   │
+   └─[5]─ apply_word_norm(safe_map, vi_only_map, lang)
+           mỗi token tra cứu safe_map trước, vi_only_map sau
+           → text chuẩn hoá
+```
+
+---
+
+# 4c. Phase 2 – Regex patterns dùng trong pipeline
+
+| Pattern | Mục đích | Ví dụ |
+|---------|----------|-------|
+| `HTML_TAG` = `<[^>]+>` | Xoá HTML tag | `<br>` → ` ` |
+| `URL_PAT` = `https?://\S+\|www\.\S+` | Xoá URL | `https://yt.be/x` → ` ` |
+| `MENTION` = `@[\w_]+` | Xoá @mention | `@admin` → ` ` |
+| `HASHTAG` = `#[\w_]+` | Xoá hashtag | `#trending` → ` ` |
+| `TIMESTAMP` = `\b\d{1,2}:\d{2}\b` | Xoá giờ phút | `12:30` → ` ` |
+| `REPEATED` = `(.)\1{2,}` | Thu gọn lặp | `đẹpppp` → `đẹpp` |
+| `UNICODE_KEEP` | Chỉ giữ ký tự hợp lệ | `★✨` → ` ` |
+| `MULTI_SP` = `\s+` | Gộp khoảng trắng | `a   b` → `a b` |
+
+---
+
+# 4d. Phase 3 – Tokenisation (chi tiết)
+
+```
+text đã chuẩn hoá
+        │
+        ├─ split_sentences()   re.split(r"(?<=[.!?…])\s+", text)
+        │   → ["câu 1", "câu 2", …]
+        │
+        └─ với mỗi câu:
+             lang == "vi" / "mixed"  →  tokenize_vi()
+             lang == "en"            →  tokenize_en()
+                │
+                ├─ underthesea: word_tokenize(sent, format="text")
+                ├─ pyvi:        ViTokenizer.tokenize(sent)
+                └─ basic:       sent.split()
+                │
+                ▼
+            clean_token(tok, lang)
+               ├─ lower + strip
+               ├─ IMPORTANT_SHORT whitelist  (ở, đi, về, lên…)
+               ├─ lọc NOISE_TOKENS           (href, http, com…)
+               ├─ lọc PARTICLE_TOKENS        (ạ, à, nha, nhé…)
+               ├─ cắt hậu tố _nha _nhé _ạ _ơi
+               ├─ lọc len ≤ 1 và isascii()
+               └─ ánh xạ sang_năm → sang
+```
+
+---
+
+# 4e. Phase 3 – Hậu xử lý token & lọc stopwords
+
+**Quyết định giữ / bỏ một token:**
+
+```
+                    token
+                      │
+          ┌───────────▼───────────┐
+          │  trong IMPORTANT_SHORT?│──Yes──► GIỮ nguyên
+          └───────────┬───────────┘
+                      │ No
+          ┌───────────▼───────────┐
+          │  NOISE / PARTICLE /   │──Yes──► BỎ
+          │  isdigit?             │
+          └───────────┬───────────┘
+                      │ No
+          ┌───────────▼───────────┐
+          │  len ≤ 1 & isascii?   │──Yes──► BỎ
+          └───────────┬───────────┘
+                      │ No
+          ┌───────────▼───────────┐
+          │  remove_stopwords=True│──Yes──► bỏ nếu trong stopwords
+          │  (mặc định False)     │         và KHÔNG trong whitelist
+          └───────────┬───────────┘
+                      │
+                    GIỮ lại
+```
+
+**Stopword whitelist** (luôn giữ dù bật lọc):
+`không, có, được, đã, đang, rất, và, là, rồi, ra, lên, về, từ, gì, ai, hay, hoặc, mà, thì, nên, với, do, bị, cho, khi, vì, nếu`
 
 ---
 
@@ -196,18 +332,21 @@ if has_vi and en_count >= 3:       return "mixed"
 
 # 8. Ví dụ chuẩn hoá thực tế
 
-**Input gốc:**
-> *"Mn oi ko đeo dưởng khí sao mà giỏi z vl ae oi"*
+**Input gốc** *(bình luận YouTube thực tế)*:
+> *"mn oi bik dc cách nấu dc ko chia sẻ ae vs nha cx thui youtobe k dc xem"*
 
 **Sau chuẩn hoá từng bước:**
 
 | Bước | Kết quả |
 |------|---------|
-| Lower + Unicode NFC | `mn oi ko đeo dưởng khí sao mà giỏi z vl ae oi` |
-| Cụm từ + đại từ | `mọi người ơi ko đeo dưỡng khí sao mà giỏi vậy rất anh em ơi` |
-| Ánh xạ teencode | `mọi người ơi không đeo dưỡng khí sao mà giỏi vậy rất anh em ơi` |
-| Tách từ (underthesea) | `mọi_người ơi không đeo dưỡng_khí sao mà giỏi vậy rất anh_em ơi` |
-| Hậu xử lý | `mọi_người không đeo dưỡng_khí sao mà giỏi vậy rất anh_em` |
+| Lower + Unicode NFC | `mn oi bik dc cách nấu dc ko chia sẻ ae vs nha cx thui youtobe k dc xem` |
+| Làm sạch nhiễu | `mn oi bik dc cách nấu dc ko chia sẻ ae vs nha cx thui youtobe k dc xem` |
+| Phát hiện ngôn ngữ | → `vi` |
+| Ánh xạ teencode | `mọi người ơi biết được cách nấu được không chia sẻ anh em với nha cũng thôi youtube không được xem` |
+| Tách từ (underthesea) | `mọi_người ơi biết được cách nấu được không chia_sẻ anh_em với nha cũng thôi youtube không được xem` |
+| Hậu xử lý token | `mọi_người biết được cách nấu được không chia_sẻ anh_em với cũng thôi youtube không được xem` |
+
+**Token cuối:** `['mọi_người', 'biết', 'được', 'cách', 'nấu', 'được', 'không', 'chia_sẻ', 'anh_em', 'với', 'cũng', 'thôi', 'youtube', 'không', 'được', 'xem']`
 
 ---
 

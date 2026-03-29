@@ -4,3 +4,6 @@ matplotlib
 scikit-learn
 underthesea
 gensim
+beautifulsoup4
+jupyter
+ipykernel
